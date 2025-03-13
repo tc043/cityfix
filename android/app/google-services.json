@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "141873008523",
+    "project_id": "cityfix-8aa25",
+    "storage_bucket": "cityfix-8aa25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141873008523:android:33fb28837cff7d0c51698e",
+        "android_client_info": {
+          "package_name": "my.edu.tarc.cityfix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxq0YMBZc17pW2bxNAIw-Trd5xRq8gHCE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
