@@ -1,77 +1,117 @@
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+
+  // List of widgets for each screen tab
+  final List<Widget> _screens = [
+    const HomeTab(),
+    const ReportIssueTab(),
+    const MapTab(),
+  ];
+
+  // When the user taps the bottom navigation bar
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3, // Number of tabs
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('CityFix Home'),
-          bottom: TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.home), text: 'Home'),
-              Tab(icon: Icon(Icons.report), text: 'Report'),
-              Tab(icon: Icon(Icons.map), text: 'Map'),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CityFix Home'),
+      ),
+      body: _screens[_selectedIndex],
+
+      // Conditionally render the FAB if we're on the "Report" tab (index 1)
+      floatingActionButton: _selectedIndex == 1
+          ? FloatingActionButton(
+        onPressed: () {
+          // Handle your "report an issue" action here
+          Navigator.pushNamed(context, '/report');
+        },
+        child: const Icon(Icons.add),
+      )
+          : null,
+
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
           ),
-        ),
-        body: TabBarView(
-          children: [
-            HomeTab(context), // Home tab content
-            ReportIssueTab(context), // Report Issue tab content
-            MapTab(context), // Map tab content
-          ],
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report),
+            label: 'Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget HomeTab(BuildContext context) {
+// Home tab content
+class HomeTab extends StatelessWidget {
+  const HomeTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             "Welcome to CityFix!",
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 10),
-          Text(
+          const SizedBox(height: 10),
+          const Text(
             "Help improve your city by reporting and tracking public issues.",
             style: TextStyle(fontSize: 16),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // Quick Action Buttons
           ElevatedButton(
             onPressed: () => Navigator.pushNamed(context, '/report'),
-            child: Text("📢 Report an Issue"),
+            child: const Text("📢 Report an Issue"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pushNamed(context, '/map'),
-            child: Text("🗺️ View Map"),
+            child: const Text("🗺️ View Map"),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pushNamed(context, '/reports'),
-            child: Text("📜 View All Reports"),
+            child: const Text("📜 View All Reports"),
           ),
-
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // Recent Reports
-          Text(
+          const Text(
             "Recent Reports",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           ListView(
             shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            children: [
+            physics: const NeverScrollableScrollPhysics(),
+            children: const [
               ListTile(
                 leading: Icon(Icons.warning, color: Colors.orange),
                 title: Text("Pothole on Main Street"),
@@ -84,21 +124,20 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 20),
 
-          SizedBox(height: 20),
-
-          // Statistics
+          // Some Statistics
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Column(
-                children: [
+                children: const [
                   Icon(Icons.report, size: 30, color: Colors.red),
                   Text("12 New Reports"),
                 ],
               ),
               Column(
-                children: [
+                children: const [
                   Icon(Icons.check_circle, size: 30, color: Colors.green),
                   Text("5 Issues Resolved"),
                 ],
@@ -109,14 +148,31 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget ReportIssueTab(BuildContext context) {
-    return Center(
-      child: Text("Report an Issue Here", style: TextStyle(fontSize: 20)),
+// Report tab content
+class ReportIssueTab extends StatelessWidget {
+  const ReportIssueTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Here you could show a list of open issues, or a form, etc.
+    // The FAB (for actually creating a new report) will show up
+    // conditionally in HomeScreen above (when index == 1).
+    return const Center(
+      child: Text("Report an Issue Tab", style: TextStyle(fontSize: 20)),
     );
   }
+}
 
-  Widget MapTab(BuildContext context) {
-    return Center(child: Text("Map View", style: TextStyle(fontSize: 20)));
+// Map tab content
+class MapTab extends StatelessWidget {
+  const MapTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text("Map View", style: TextStyle(fontSize: 20)),
+    );
   }
 }

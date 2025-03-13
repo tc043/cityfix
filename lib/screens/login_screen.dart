@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'home_screen.dart';
-import 'registration_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -13,19 +11,36 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  final supabase = Supabase.instance.client;
+
   Future<void> _login() async {
     setState(() {
       _isLoading = true;
     });
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final response = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
       );
-      Navigator.pushReplacementNamed(context, '/home');
-    } on FirebaseAuthException catch (e) {
+
+      if (response.user != null) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: No user returned')),
+        );
+      }
+    } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login Failed: ${e.message}')),
+        SnackBar(content: Text('Login failed: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unexpected error: ${e.toString()}')),
       );
     } finally {
       setState(() {
@@ -37,9 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Login'),
-      ),
+      appBar: AppBar(title: Text('Login')),
       body: Padding(
         padding: EdgeInsets.all(16.0),
         child: Column(

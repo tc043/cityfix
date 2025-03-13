@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegistrationScreen extends StatefulWidget {
   @override
@@ -12,19 +11,36 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  final supabase = Supabase.instance.client;
+
   Future<void> _register() async {
     setState(() {
       _isLoading = true;
     });
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final response = await supabase.auth.signUp(
+        email: email,
+        password: password,
       );
-      Navigator.pushReplacementNamed(context, '/home');
-    } on FirebaseAuthException catch (e) {
+
+      if (response.user != null) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed: No user returned')),
+        );
+      }
+    } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration Failed: ${e.message}')),
+        SnackBar(content: Text('Registration failed: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unexpected error: ${e.toString()}')),
       );
     } finally {
       setState(() {
