@@ -5,7 +5,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/registration_screen.dart';
 import 'screens/report_issue_screen.dart';
-import 'screens/map_screen.dart';
+import 'screens/tabs/map_tab.dart';
 import 'screens/reports_list_screen.dart';
 import 'firebase_options.dart';
 
@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegistrationScreen(),
         '/report': (context) => ReportIssueScreen(),
-        '/map': (context) => MapScreen(),
+        '/map': (context) => MapTab(),
         '/reports': (context) => ReportsListScreen(),
       },
     );

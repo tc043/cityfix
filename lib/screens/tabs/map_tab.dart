@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({Key? key}) : super(key: key);
+class MapTab extends StatefulWidget {
+  const MapTab({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  State<MapTab> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapTab> {
   final MapController _mapController = MapController();
 
   // 🌍 Set Malaysia (Kuala Lumpur) as the default map center
@@ -25,31 +25,34 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _fetchReports() async {
-    final supabase = Supabase.instance.client;
-    final response = await supabase.from('reports').select();
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('reports').get();
+      if (snapshot.docs.isEmpty) {
+        debugPrint('No reports found.');
+        return;
+      }
 
-    if (response == null || response.isEmpty) {
-      debugPrint('No reports found.');
-      return;
+      List<Marker> fetchedMarkers = snapshot.docs.map((doc) {
+        final report = doc.data();
+        return Marker(
+          width: 50,
+          height: 50,
+          point: LatLng(report['latitude'], report['longitude']),
+          child: GestureDetector(
+            onTap: () {
+              _showReportDialog(report);
+            },
+            child: const Icon(Icons.location_pin, size: 40, color: Colors.red),
+          ),
+        );
+      }).toList();
+
+      setState(() {
+        _markers = fetchedMarkers;
+      });
+    } catch (e) {
+      debugPrint('Error fetching reports: $e');
     }
-
-    List<Marker> fetchedMarkers = response.map<Marker>((report) {
-      return Marker(
-        width: 50,
-        height: 50,
-        point: LatLng(report['latitude'], report['longitude']),
-        child: GestureDetector(
-          onTap: () {
-            _showReportDialog(report);
-          },
-          child: const Icon(Icons.location_pin, size: 40, color: Colors.red),
-        ),
-      );
-    }).toList();
-
-    setState(() {
-      _markers = fetchedMarkers;
-    });
   }
 
   void _showReportDialog(Map<String, dynamic> report) {
@@ -61,7 +64,7 @@ class _MapScreenState extends State<MapScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (report['image_url'] != null)
+              if (report['image_url'] != null && report['image_url'].toString().isNotEmpty)
                 Image.network(report['image_url'], height: 150, fit: BoxFit.cover),
               const SizedBox(height: 10),
               Text('Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
@@ -82,11 +85,10 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reported Issues Map')),
       body: FlutterMap(
         mapController: _mapController,
         options: MapOptions(
-          initialCenter: _initialPosition, // 🌍 Starts in Malaysia 🇲🇾
+          initialCenter: _initialPosition,
           initialZoom: 12,
         ),
         children: [

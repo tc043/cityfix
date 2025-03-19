@@ -3,20 +3,16 @@ import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as lat_lng;
-
-// For mobile compression
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-
-// For web compression (pure Dart)
 import 'package:image/image.dart' as img;
 
-// Supabase
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ReportIssueScreen extends StatefulWidget {
   const ReportIssueScreen({Key? key}) : super(key: key);
@@ -26,12 +22,9 @@ class ReportIssueScreen extends StatefulWidget {
 }
 
 class _ReportIssueScreenState extends State<ReportIssueScreen> {
-  /// We'll store the final compressed image data here (both mobile & web).
   Uint8List? _imageBytes;
-
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _descriptionController = TextEditingController();
-
   Position? _currentPosition;
 
   @override
@@ -40,45 +33,23 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     _getCurrentLocation();
   }
 
-  /// Picks an image from camera or gallery, then compresses:
-  /// - On web, use the image package
-  /// - On mobile, use flutter_image_compress
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(source: source);
-      if (pickedFile == null) {
-        debugPrint('No file picked (user may have cancelled).');
-        return;
-      }
+      if (pickedFile == null) return;
 
-      debugPrint('Picked file: ${pickedFile.path}');
       if (kIsWeb) {
-        // *** WEB ***: read raw bytes, then compress with the 'image' package
-        debugPrint('Platform is WEB; using "image" package for compression.');
         final rawBytes = await pickedFile.readAsBytes();
-
-        // Decode to an in-memory image
         final decodedImage = img.decodeImage(rawBytes);
-        if (decodedImage == null) {
-          debugPrint('Failed to decode web image');
-          return;
-        }
-
-        // Optionally resize (e.g., width=800)
+        if (decodedImage == null) return;
         final resized = img.copyResize(decodedImage, width: 800);
-        // Re-encode as JPEG with 70% quality
         final compressedBytes = img.encodeJpg(resized, quality: 70);
-
         setState(() {
           _imageBytes = Uint8List.fromList(compressedBytes);
         });
-        debugPrint('Web image compressed. Final bytes length: ${_imageBytes!.length}');
       } else {
-        // *** MOBILE ***: we have a File, compress with flutter_image_compress
-        debugPrint('Platform is MOBILE; using flutter_image_compress.');
         final file = File(pickedFile.path);
         final fileBytes = await file.readAsBytes();
-
         final compressed = await FlutterImageCompress.compressWithList(
           fileBytes,
           quality: 70,
@@ -86,130 +57,87 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         setState(() {
           _imageBytes = compressed;
         });
-        debugPrint('Mobile image compressed. Final bytes length: ${_imageBytes!.length}');
       }
     } catch (e) {
-      debugPrint('Error picking/compressing image: $e');
       _showError('Error picking or compressing image: $e');
     }
   }
 
-  /// Get the current device location
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
 
-    // Check if location services are enabled
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      debugPrint('Location services disabled.');
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      final permAfterReq = await Geolocator.requestPermission();
-      debugPrint('Permission after request: $permAfterReq');
-      if (permAfterReq == LocationPermission.denied) {
-        debugPrint('Location permissions denied.');
-        return;
-      }
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      debugPrint('Location permissions permanently denied.');
-      return;
-    }
-
-    // If we reach here, location is presumably granted
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     setState(() {
       _currentPosition = position;
     });
-    debugPrint('Got location: $_currentPosition');
   }
 
-  /// Show error in a SnackBar
   void _showError(String msg) {
-    debugPrint('ERROR: $msg');
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  /// Submits the report to Supabase (Storage + Database)
   Future<void> _submitReport() async {
-    // Validate description
     if (_descriptionController.text.trim().isEmpty) {
       _showError('Please enter a description.');
       return;
     }
 
-    // Validate location
     if (_currentPosition == null) {
       _showError('Location not available.');
       return;
     }
 
-    // Get Supabase client instance
-    final supabase = Supabase.instance.client;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showError('User not logged in.');
+      return;
+    }
 
     String? imageUrl;
     if (_imageBytes != null) {
-      // Generate a unique file name for the image
       final fileName = 'report_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
+      final storageRef = FirebaseStorage.instance.ref().child('reports/$fileName');
       try {
-        // Upload the image bytes to Supabase Storage.
-        // Ensure a bucket named 'reports' exists in your Supabase project.
-        await supabase.storage.from('reports').uploadBinary(fileName, _imageBytes!);
-        // Get the public URL for the uploaded image.
-        imageUrl = supabase.storage.from('reports').getPublicUrl(fileName);
+        await storageRef.putData(_imageBytes!);
+        imageUrl = await storageRef.getDownloadURL();
       } catch (error) {
         _showError('Image upload failed: $error');
         return;
       }
     }
 
-    // Prepare the report data to be inserted into the 'reports' table.
-    final Map<String, dynamic> reportData = {
+    final reportData = {
       'description': _descriptionController.text.trim(),
       'latitude': _currentPosition!.latitude,
       'longitude': _currentPosition!.longitude,
       'image_url': imageUrl,
+      'user_id': user.uid,
       'created_at': DateTime.now().toIso8601String(),
     };
 
     try {
-      final response = await supabase.from('reports').insert(reportData);
-      if (response?.error != null) {
-        _showError('Report submission failed: ${response.error!.message}');
-        return;
-      }
-      if (!mounted) {
-        return;
-      }
+      await FirebaseFirestore.instance.collection('reports').add(reportData);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Report submitted successfully!')),
       );
-      // Clear the form
       setState(() {
         _imageBytes = null;
         _descriptionController.clear();
       });
-      // Check if the widget is still mounted before navigating
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       Navigator.pop(context);
     } catch (error) {
       _showError('Report submission failed: $error');
     }
-
   }
 
-  /// True if image is selected
   bool get _hasImage => _imageBytes != null;
 
   @override
@@ -217,14 +145,11 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     final bool locationReady = _currentPosition != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Report Issue'),
-      ),
+      appBar: AppBar(title: const Text('Report Issue')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // BOX with either 2 buttons or image preview
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -235,8 +160,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
               child: _hasImage ? _buildImagePreview() : _buildImageButtons(),
             ),
             const SizedBox(height: 20),
-
-            // Description
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -246,8 +169,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 20),
-
-            // Map or spinner
             if (!locationReady) ...[
               const CircularProgressIndicator(),
               const SizedBox(height: 8),
@@ -290,13 +211,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude}',
-              ),
+              Text('Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude}'),
             ],
             const SizedBox(height: 20),
-
-            // Submit button
             ElevatedButton(
               onPressed: _submitReport,
               child: const Text('Submit Report'),
@@ -307,7 +224,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     );
   }
 
-  /// Shows 2 buttons if no image is selected
   Widget _buildImageButtons() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -327,7 +243,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     );
   }
 
-  /// Shows image preview and a remove button
   Widget _buildImagePreview() {
     return Column(
       children: [
@@ -338,12 +253,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
         ),
         const SizedBox(height: 8),
         TextButton(
-          onPressed: () {
-            debugPrint('Remove image pressed');
-            setState(() {
-              _imageBytes = null;
-            });
-          },
+          onPressed: () => setState(() => _imageBytes = null),
           child: const Text('Remove Image'),
         ),
       ],
