@@ -229,6 +229,7 @@ class _HomeTabState extends State<HomeTab> {
                           titlesData: FlTitlesData(
                             topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             leftTitles: AxisTitles(
+                              axisNameWidget: Text('Reports'),
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 interval: (_trendMode == 'weekly') ? 1 : (_trendMode == 'monthly' ? 5 : 30),
@@ -238,6 +239,7 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                             rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             bottomTitles: AxisTitles(
+                              axisNameWidget: Text('Date'),
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 interval: (_trendMode == 'weekly') ? 1 : (_trendMode == 'monthly' ? 5 : 30),
