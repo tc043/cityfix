@@ -1,47 +1,102 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({Key? key}) : super(key: key);
 
   @override
-  _MapScreenState createState() => _MapScreenState();
+  State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  late GoogleMapController mapController;
-  final LatLng _initialPosition = const LatLng(37.7749, -122.4194);
-  final Set<Marker> _markers = {};
+  final MapController _mapController = MapController();
+
+  // 🌍 Set Malaysia (Kuala Lumpur) as the default map center
+  final LatLng _initialPosition = const LatLng(3.1390, 101.6869);
+
+  List<Marker> _markers = [];
 
   @override
   void initState() {
     super.initState();
-    _markers.add(
-      Marker(
-        markerId: MarkerId('dummy'),
-        position: _initialPosition,
-        infoWindow: InfoWindow(title: 'Reported Issue'),
-      ),
-    );
+    _fetchReports();
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
+  Future<void> _fetchReports() async {
+    final supabase = Supabase.instance.client;
+    final response = await supabase.from('reports').select();
+
+    if (response == null || response.isEmpty) {
+      debugPrint('No reports found.');
+      return;
+    }
+
+    List<Marker> fetchedMarkers = response.map<Marker>((report) {
+      return Marker(
+        width: 50,
+        height: 50,
+        point: LatLng(report['latitude'], report['longitude']),
+        child: GestureDetector(
+          onTap: () {
+            _showReportDialog(report);
+          },
+          child: const Icon(Icons.location_pin, size: 40, color: Colors.red),
+        ),
+      );
+    }).toList();
+
+    setState(() {
+      _markers = fetchedMarkers;
+    });
+  }
+
+  void _showReportDialog(Map<String, dynamic> report) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(report['description'] ?? 'No description'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (report['image_url'] != null)
+                Image.network(report['image_url'], height: 150, fit: BoxFit.cover),
+              const SizedBox(height: 10),
+              Text('Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
+              Text('Reported on: ${report['created_at']}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Reported Issues Map'),
-      ),
-      body: GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _initialPosition,
-          zoom: 12.0,
+      appBar: AppBar(title: const Text('Reported Issues Map')),
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _initialPosition, // 🌍 Starts in Malaysia 🇲🇾
+          initialZoom: 12,
         ),
-        markers: _markers,
+        children: [
+          TileLayer(
+            urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: const ['a', 'b', 'c'],
+            userAgentPackageName: 'com.example.app',
+          ),
+          MarkerLayer(markers: _markers),
+        ],
       ),
     );
   }
