@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -13,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // List of widgets for each screen tab
   final List<Widget> _screens = [
     const HomeTab(),
-    const ReportIssueTab(),
+    const ReportIssueTab(), // Now displays reports from Supabase
     const MapTab(),
   ];
 
@@ -32,11 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: _screens[_selectedIndex],
 
-      // Conditionally render the FAB if we're on the "Report" tab (index 1)
       floatingActionButton: _selectedIndex == 1
           ? FloatingActionButton(
         onPressed: () {
-          // Handle your "report an issue" action here
           Navigator.pushNamed(context, '/report');
         },
         child: const Icon(Icons.add),
@@ -87,7 +86,6 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Quick Action Buttons
           ElevatedButton(
             onPressed: () => Navigator.pushNamed(context, '/report'),
             child: const Text("📢 Report an Issue"),
@@ -102,7 +100,6 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Recent Reports
           const Text(
             "Recent Reports",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -126,7 +123,6 @@ class HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Some Statistics
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -150,17 +146,72 @@ class HomeTab extends StatelessWidget {
   }
 }
 
-// Report tab content
-class ReportIssueTab extends StatelessWidget {
+// Report tab content - Fetch and display reports from Supabase
+class ReportIssueTab extends StatefulWidget {
   const ReportIssueTab({Key? key}) : super(key: key);
 
   @override
+  State<ReportIssueTab> createState() => _ReportIssueTabState();
+}
+
+class _ReportIssueTabState extends State<ReportIssueTab> {
+  Future<List<dynamic>>? _reportsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsFuture = _fetchReports();
+  }
+
+  Future<List<dynamic>> _fetchReports() async {
+    final supabase = Supabase.instance.client;
+    final response = await supabase
+        .from('reports')
+        .select()
+        .order('created_at', ascending: false); // Fetch reports, newest first
+
+    if (response == null) {
+      throw Exception('Error fetching reports.');
+    }
+    return response;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Here you could show a list of open issues, or a form, etc.
-    // The FAB (for actually creating a new report) will show up
-    // conditionally in HomeScreen above (when index == 1).
-    return const Center(
-      child: Text("Report an Issue Tab", style: TextStyle(fontSize: 20)),
+    return FutureBuilder<List<dynamic>>(
+      future: _reportsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error loading reports: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No reports available.'));
+        }
+
+        final reports = snapshot.data!;
+        return ListView.builder(
+          itemCount: reports.length,
+          itemBuilder: (context, index) {
+            final report = reports[index] as Map<String, dynamic>;
+            return ListTile(
+              leading: report['image_url'] != null
+                  ? Image.network(
+                report['image_url'],
+                width: 50,
+                height: 50,
+                fit: BoxFit.cover,
+              )
+                  : const Icon(Icons.report),
+              title: Text(report['description'] ?? 'No description'),
+              subtitle: Text('Reported at: ${report['created_at']}'),
+              onTap: () {
+                // Navigate to a detailed view if needed
+              },
+            );
+          },
+        );
+      },
     );
   }
 }
