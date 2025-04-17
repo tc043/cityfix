@@ -29,23 +29,41 @@ class _ReportIssueTabState extends State<ReportIssueTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Reported Issues',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.teal,
+        elevation: 4,
+      ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _reportsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error loading reports: ${snapshot.error}'));
+            return Center(
+                child: Text('Error loading reports: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('No reports available.'));
           }
 
           final reports = snapshot.data!;
-          return ListView.builder(
-            itemCount: reports.length,
-            itemBuilder: (context, index) {
-              return ReportCard(report: reports[index]);
+          return RefreshIndicator(
+            onRefresh: () async {
+              final newReports = await _fetchReports();
+              setState(() {
+                _reportsFuture = Future.value(newReports);
+              });
             },
+            child: ListView.builder(
+              itemCount: reports.length,
+              itemBuilder: (context, index) {
+                return ReportCard(report: reports[index]);
+              },
+            ),
           );
         },
       ),

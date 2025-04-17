@@ -26,7 +26,8 @@ class _MapScreenState extends State<MapTab> {
 
   Future<void> _fetchReports() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('reports').get();
+      final snapshot = await FirebaseFirestore.instance.collection('reports')
+          .get();
       if (snapshot.docs.isEmpty) {
         debugPrint('No reports found.');
         return;
@@ -64,10 +65,14 @@ class _MapScreenState extends State<MapTab> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (report['image_url'] != null && report['image_url'].toString().isNotEmpty)
-                Image.network(report['image_url'], height: 150, fit: BoxFit.cover),
+              if (report['image_url'] != null && report['image_url']
+                  .toString()
+                  .isNotEmpty)
+                Image.network(
+                    report['image_url'], height: 150, fit: BoxFit.cover),
               const SizedBox(height: 10),
-              Text('Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
+              Text(
+                  'Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
               Text('Reported on: ${report['created_at']}'),
             ],
           ),
@@ -85,6 +90,15 @@ class _MapScreenState extends State<MapTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'CityFix Map',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.teal,
+        elevation: 4,
+      ),
       body: FlutterMap(
         mapController: _mapController,
         options: MapOptions(
