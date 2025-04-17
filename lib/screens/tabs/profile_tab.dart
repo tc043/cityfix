@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:cityfix/theme_controller.dart';
+import 'package:intl/intl.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -20,11 +21,18 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _isLoading = true;
   bool _notificationsEnabled = true;
 
+  final int _pageSize = 10;
+  DocumentSnapshot? _lastVisible;
+  final List<Map<String, dynamic>> _reports = [];
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+
   @override
   void initState() {
     super.initState();
     _fetchUserData();
     _loadPreferences();
+    _fetchUserReports();
   }
 
   Future<void> _fetchUserData() async {
@@ -34,7 +42,8 @@ class _ProfileTabState extends State<ProfileTab> {
       return;
     }
 
-    final snapshot = await _firestore.collection('profiles').doc(user.uid).get();
+    final snapshot =
+        await _firestore.collection('profiles').doc(user.uid).get();
 
     if (snapshot.exists) {
       setState(() {
@@ -57,31 +66,71 @@ class _ProfileTabState extends State<ProfileTab> {
     await prefs.setBool('notificationsEnabled', _notificationsEnabled);
   }
 
-  Future<List<Map<String, dynamic>>> _fetchUserReports() async {
-    final user = _auth.currentUser;
-    if (user == null) return [];
+  Future<void> _fetchUserReports() async {
+    if (_isLoadingMore || !_hasMore) return;
 
-    final snapshot = await _firestore
+    setState(() => _isLoadingMore = true);
+
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    Query query = _firestore
         .collection('reports')
         .where('user_id', isEqualTo: user.uid)
         .orderBy('created_at', descending: true)
-        .get();
+        .limit(_pageSize);
 
-    return snapshot.docs.map((doc) => {
-      ...doc.data(),
-      'id': doc.id,
+    if (_lastVisible != null) {
+      query = query.startAfterDocument(_lastVisible!);
+    }
+
+    final snapshot = await query.get();
+    if (snapshot.docs.isNotEmpty) {
+      _lastVisible = snapshot.docs.last;
+    }
+
+    final newReports = snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      return {
+        ...data,
+        'id': doc.id,
+      };
     }).toList();
+
+    setState(() {
+      _reports.addAll(newReports);
+      _hasMore = newReports.length == _pageSize;
+      _isLoadingMore = false;
+    });
   }
 
   Future<void> _deleteReport(String reportId) async {
     await _firestore.collection('reports').doc(reportId).delete();
-    setState(() {});
+    setState(() {
+      _reports.removeWhere((r) => r['id'] == reportId);
+    });
   }
 
   Future<void> _signOut() async {
     await _auth.signOut();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+  String _formatTimestamp(dynamic ts) {
+    if (ts is Timestamp) {
+      final date = ts.toDate();
+      return DateFormat('yyyy-MM-dd HH:mm').format(date);
+    } else if (ts is String) {
+      try {
+        final date = DateTime.parse(ts);
+        return DateFormat('yyyy-MM-dd HH:mm').format(date);
+      } catch (_) {
+        return 'Invalid date';
+      }
+    } else {
+      return 'Invalid date';
+    }
   }
 
   @override
@@ -109,7 +158,8 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundImage: _userData?['avatar_url'] != null
+              backgroundImage: (_userData?['avatar_url'] != null &&
+                      _userData!['avatar_url'].toString().startsWith('http'))
                   ? NetworkImage(_userData!['avatar_url'])
                   : null,
               child: _userData?['avatar_url'] == null
@@ -117,7 +167,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   : null,
             ),
             const SizedBox(height: 10),
-
             Text(
               _userData?['full_name'] ?? 'No Name',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -125,55 +174,94 @@ class _ProfileTabState extends State<ProfileTab> {
             Text(_userData?['email'] ?? 'No Email',
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
-
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/edit-profile');
+                Navigator.pushNamed(context, '/edit-profile')
+                    .then((_) => _fetchUserData());
               },
               child: const Text("Edit Profile"),
             ),
-
             const SizedBox(height: 20),
             const Divider(),
-
             const Text("Your Reports",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _fetchUserReports(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No reports submitted.'));
-                  }
-
-                  final reports = snapshot.data!;
-                  return ListView.builder(
-                    itemCount: reports.length,
-                    itemBuilder: (context, index) {
-                      final report = reports[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          title: Text(report['description']),
-                          subtitle: Text('Reported on: ${report['created_at']}'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteReport(report['id']),
-                          ),
+              child: _reports.isEmpty
+                  ? const Center(child: Text('No reports submitted.'))
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (scrollInfo) {
+                        if (!_isLoadingMore &&
+                            _hasMore &&
+                            scrollInfo.metrics.pixels ==
+                                scrollInfo.metrics.maxScrollExtent) {
+                          _fetchUserReports();
+                        }
+                        return false;
+                      },
+                      child: RefreshIndicator(
+                        onRefresh: () async {
+                          setState(() {
+                            _reports.clear();
+                            _lastVisible = null;
+                            _hasMore = true;
+                          });
+                          await _fetchUserReports();
+                        },
+                        child: ListView.builder(
+                          itemCount: _reports.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _reports.length) {
+                              return const Center(
+                                  child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: CircularProgressIndicator(),
+                              ));
+                            }
+                            final report = _reports[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              child: ListTile(
+                                title: Text(report['description']),
+                                subtitle: Text(
+                                    'Reported on: ${_formatTimestamp(report['created_at'])}'),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text("Confirm Deletion"),
+                                        content: const Text(
+                                            "Are you sure you want to delete this report?"),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text("Cancel"),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              _deleteReport(report['id']);
+                                            },
+                                            child: const Text("Delete",
+                                                style: TextStyle(
+                                                    color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
+                    ),
             ),
-
             const Divider(),
-
             SwitchListTile(
               title: const Text('Enable Notifications'),
               secondary: const Icon(Icons.notifications),
@@ -185,7 +273,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 _savePreferences();
               },
             ),
-
             SwitchListTile(
               title: const Text('Dark Mode'),
               secondary: const Icon(Icons.dark_mode),
@@ -194,7 +281,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 themeController.toggleTheme(value);
               },
             ),
-
             ElevatedButton.icon(
               onPressed: _signOut,
               icon: const Icon(Icons.logout),

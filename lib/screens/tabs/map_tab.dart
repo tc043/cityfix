@@ -105,15 +105,8 @@ class _MapScreenState extends State<MapTab> {
           initialZoom: 6.0,
           maxZoom: 18.0,
           minZoom: 5.0,
-          cameraConstraint: CameraConstraint.contain(
-            bounds: LatLngBounds(
-              const LatLng(0.9, 99.5), // Southwest corner of Malaysia
-              const LatLng(7.5, 120.0), // Northeast corner of Malaysia
-            ),
-          ),
           interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag |InteractiveFlag.doubleTapZoom,
-            // only allow pinch and drag
+            flags: InteractiveFlag.all,
             scrollWheelVelocity: 0.01,
             pinchZoomThreshold: 0.3,
             pinchMoveThreshold: 20.0,
