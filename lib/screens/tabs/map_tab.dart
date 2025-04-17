@@ -26,8 +26,8 @@ class _MapScreenState extends State<MapTab> {
 
   Future<void> _fetchReports() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('reports')
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance.collection('reports').get();
       if (snapshot.docs.isEmpty) {
         debugPrint('No reports found.');
         return;
@@ -65,11 +65,10 @@ class _MapScreenState extends State<MapTab> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (report['image_url'] != null && report['image_url']
-                  .toString()
-                  .isNotEmpty)
-                Image.network(
-                    report['image_url'], height: 150, fit: BoxFit.cover),
+              if (report['image_url'] != null &&
+                  report['image_url'].toString().isNotEmpty)
+                Image.network(report['image_url'],
+                    height: 150, fit: BoxFit.cover),
               const SizedBox(height: 10),
               Text(
                   'Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
@@ -103,7 +102,22 @@ class _MapScreenState extends State<MapTab> {
         mapController: _mapController,
         options: MapOptions(
           initialCenter: _initialPosition,
-          initialZoom: 12,
+          initialZoom: 6.0,
+          maxZoom: 18.0,
+          minZoom: 5.0,
+          cameraConstraint: CameraConstraint.contain(
+            bounds: LatLngBounds(
+              const LatLng(0.9, 99.5), // Southwest corner of Malaysia
+              const LatLng(7.5, 120.0), // Northeast corner of Malaysia
+            ),
+          ),
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag |InteractiveFlag.doubleTapZoom,
+            // only allow pinch and drag
+            scrollWheelVelocity: 0.01,
+            pinchZoomThreshold: 0.3,
+            pinchMoveThreshold: 20.0,
+          ),
         ),
         children: [
           TileLayer(

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:cityfix/theme_controller.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -15,11 +18,13 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _loadPreferences();
   }
 
   Future<void> _fetchUserData() async {
@@ -38,6 +43,18 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? true;
+    });
+  }
+
+  Future<void> _savePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
   }
 
   Future<List<Map<String, dynamic>>> _fetchUserReports() async {
@@ -69,11 +86,23 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = Provider.of<ThemeController>(context);
+    final isDarkMode = themeController.themeMode == ThemeMode.dark;
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Your Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.teal,
+        elevation: 4,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -144,6 +173,27 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
 
             const Divider(),
+
+            SwitchListTile(
+              title: const Text('Enable Notifications'),
+              secondary: const Icon(Icons.notifications),
+              value: _notificationsEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _notificationsEnabled = value;
+                });
+                _savePreferences();
+              },
+            ),
+
+            SwitchListTile(
+              title: const Text('Dark Mode'),
+              secondary: const Icon(Icons.dark_mode),
+              value: isDarkMode,
+              onChanged: (value) {
+                themeController.toggleTheme(value);
+              },
+            ),
 
             ElevatedButton.icon(
               onPressed: _signOut,

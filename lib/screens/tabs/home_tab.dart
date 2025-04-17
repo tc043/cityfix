@@ -13,39 +13,41 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   String _trendMode = 'weekly';
 
-  Future<int> _fetchReportCount({bool within24Hours = false}) async {
-    final collection = FirebaseFirestore.instance.collection('reports');
-    Query query = collection;
+  Future<Map<String, int>> _fetchDashboardCounts() async {
+    final now = DateTime.now();
+    final past24h = now.subtract(const Duration(hours: 24));
 
-    if (within24Hours) {
-      final now = DateTime.now();
-      final past24h = now.subtract(const Duration(hours: 24));
-      query =
-          query.where('created_at', isGreaterThan: past24h.toIso8601String());
+    final snapshot = await FirebaseFirestore.instance.collection('reports').get();
+
+    int total = 0;
+    int resolved = 0;
+    int recent = 0;
+    int recentResolved = 0;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      total++;
+
+      final createdAt = DateTime.tryParse(data['created_at'] ?? '') ?? now;
+      final isRecent = createdAt.isAfter(past24h);
+
+      if (data['status'] == 'resolved') {
+        resolved++;
+        if (isRecent) recentResolved++;
+      }
+      if (isRecent) recent++;
     }
 
-    final snapshot = await query.get();
-    return snapshot.docs.length;
-  }
-
-  Future<int> _fetchResolvedCount({bool within24Hours = false}) async {
-    final collection = FirebaseFirestore.instance.collection('reports');
-    Query query = collection.where('status', isEqualTo: 'resolved');
-
-    if (within24Hours) {
-      final now = DateTime.now();
-      final past24h = now.subtract(const Duration(hours: 24));
-      query =
-          query.where('created_at', isGreaterThan: past24h.toIso8601String());
-    }
-
-    final snapshot = await query.get();
-    return snapshot.docs.length;
+    return {
+      'total': total,
+      'resolved': resolved,
+      'recent': recent,
+      'recentResolved': recentResolved,
+    };
   }
 
   Future<Map<String, int>> _fetchStatusDistribution() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('reports').get();
+    final snapshot = await FirebaseFirestore.instance.collection('reports').get();
     int resolved = 0;
     int unresolved = 0;
     for (var doc in snapshot.docs) {
@@ -60,29 +62,26 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<Map<String, int>> _fetchTrendData(String mode) async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('reports').get();
     final now = DateTime.now();
-    final Map<String, int> trends = SplayTreeMap();
+    final range = mode == 'monthly' ? 30 : mode == 'yearly' ? 365 : 7;
+    final earliestDate = now.subtract(Duration(days: range));
 
-    int range = mode == 'monthly'
-        ? 30
-        : mode == 'yearly'
-            ? 365
-            : 7;
+    final snapshot = await FirebaseFirestore.instance
+        .collection('reports')
+        .where('created_at', isGreaterThan: earliestDate.toIso8601String())
+        .get();
+
+    final Map<String, int> trends = SplayTreeMap();
 
     for (var i = range - 1; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
-      final key =
-          "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      final key = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       trends[key] = 0;
     }
 
     for (var doc in snapshot.docs) {
-      final createdAt =
-          DateTime.tryParse(doc['created_at'] ?? '') ?? DateTime.now();
-      final key =
-          "${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}";
+      final createdAt = DateTime.tryParse(doc['created_at'] ?? '') ?? now;
+      final key = "${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}";
       if (trends.containsKey(key)) {
         trends[key] = trends[key]! + 1;
       }
@@ -91,31 +90,19 @@ class _HomeTabState extends State<HomeTab> {
     return trends;
   }
 
-  void _navigateToFiltered(BuildContext context, String filter) {
-    Navigator.pushNamed(context, '/reports', arguments: {'filter': filter});
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'CityFix Dashboard',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
+        title: const Text('CityFix Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: true,
         backgroundColor: Colors.teal,
         elevation: 4,
-        leading: Icon(Icons.dashboard, color: Colors.white),
+        leading: const Icon(Icons.dashboard, color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // Navigate to settings if needed
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -124,77 +111,44 @@ class _HomeTabState extends State<HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Dashboard",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text("Dashboard", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            const Text("Monitor city issues in real time.",
-                style: TextStyle(fontSize: 16)),
+            const Text("Monitor city issues in real time.", style: TextStyle(fontSize: 16)),
             const SizedBox(height: 30),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                FutureBuilder<int>(
-                  future: _fetchReportCount(),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data ?? 0;
-                    return GestureDetector(
-                      onTap: () => _navigateToFiltered(context, 'all'),
-                      child: _buildStatCard(
-                          "Total Reports", count, Icons.report, Colors.red),
-                    );
-                  },
-                ),
-                FutureBuilder<int>(
-                  future: _fetchResolvedCount(),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data ?? 0;
-                    return GestureDetector(
-                      onTap: () => _navigateToFiltered(context, 'resolved'),
-                      child: _buildStatCard("Total Resolved", count,
-                          Icons.check_circle, Colors.green),
-                    );
-                  },
-                ),
-              ],
+
+            FutureBuilder<Map<String, int>>(
+              future: _fetchDashboardCounts(),
+              builder: (context, snapshot) {
+                final data = snapshot.data ?? {'total': 0, 'resolved': 0, 'recent': 0, 'recentResolved': 0};
+                return Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatCard("Total Reports", data['total']!, Icons.report, Colors.red),
+                        _buildStatCard("Total Resolved", data['resolved']!, Icons.check_circle, Colors.green),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatCard("Reports (24h)", data['recent']!, Icons.access_time, Colors.orange),
+                        _buildStatCard("Resolved (24h)", data['recentResolved']!, Icons.update, Colors.blue),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                FutureBuilder<int>(
-                  future: _fetchReportCount(within24Hours: true),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data ?? 0;
-                    return GestureDetector(
-                      onTap: () => _navigateToFiltered(context, 'recent'),
-                      child: _buildStatCard("Reports (24h)", count,
-                          Icons.access_time, Colors.orange),
-                    );
-                  },
-                ),
-                FutureBuilder<int>(
-                  future: _fetchResolvedCount(within24Hours: true),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data ?? 0;
-                    return GestureDetector(
-                      onTap: () =>
-                          _navigateToFiltered(context, 'recent_resolved'),
-                      child: _buildStatCard(
-                          "Resolved (24h)", count, Icons.update, Colors.blue),
-                    );
-                  },
-                ),
-              ],
-            ),
+
             const SizedBox(height: 30),
-            const Text("Status Distribution",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Status Distribution", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             FutureBuilder<Map<String, int>>(
               future: _fetchStatusDistribution(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
-                  return const Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final data = snapshot.data!;
                 final total = data.values.fold(0, (a, b) => a + b);
                 return AspectRatio(
@@ -202,19 +156,12 @@ class _HomeTabState extends State<HomeTab> {
                   child: PieChart(
                     PieChartData(
                       sections: data.entries.map((entry) {
-                        final percent =
-                            total == 0 ? 0 : (entry.value / total) * 100;
+                        final percent = total == 0 ? 0 : (entry.value / total) * 100;
                         return PieChartSectionData(
                           value: entry.value.toDouble(),
-                          title:
-                              "${entry.key} (${percent.toStringAsFixed(1)}%)",
-                          color: entry.key == 'Resolved'
-                              ? Colors.green
-                              : Colors.red,
-                          titleStyle: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                          title: "${entry.key} (${percent.toStringAsFixed(1)}%)",
+                          color: entry.key == 'Resolved' ? Colors.green : Colors.red,
+                          titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                           radius: 70,
                         );
                       }).toList(),
@@ -225,13 +172,12 @@ class _HomeTabState extends State<HomeTab> {
                 );
               },
             ),
+
             const SizedBox(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Report Trend",
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text("Report Trend", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 DropdownButton<String>(
                   value: _trendMode,
                   items: const [
@@ -251,14 +197,11 @@ class _HomeTabState extends State<HomeTab> {
             FutureBuilder<Map<String, int>>(
               future: _fetchTrendData(_trendMode),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
-                  return const Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final data = snapshot.data!;
                 final keys = data.keys.toList();
                 final values = data.values.toList();
-                final average = values.isEmpty
-                    ? 0
-                    : (values.reduce((a, b) => a + b) / values.length).round();
+                final average = values.isEmpty ? 0 : (values.reduce((a, b) => a + b) / values.length).round();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -268,45 +211,31 @@ class _HomeTabState extends State<HomeTab> {
                         LineChartData(
                           lineBarsData: [
                             LineChartBarData(
-                              spots: List.generate(
-                                  values.length,
-                                  (i) => FlSpot(
-                                      i.toDouble(), values[i].toDouble())),
+                              spots: List.generate(values.length, (i) => FlSpot(i.toDouble(), values[i].toDouble())),
                               isCurved: true,
                               barWidth: 3,
                               dotData: FlDotData(show: true),
                               color: Colors.teal,
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: Colors.teal.withValues(alpha: 0.2),
-                              ),
+                              belowBarData: BarAreaData(show: true, color: Colors.teal.withValues(alpha: 0.2)),
                             ),
                           ],
                           titlesData: FlTitlesData(
-                            topTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false)),
+                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             leftTitles: AxisTitles(
-                              axisNameWidget: Text('Reports'),
+                              axisNameWidget: const Text('Reports'),
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                interval: (_trendMode == 'weekly')
-                                    ? 1
-                                    : (_trendMode == 'monthly' ? 5 : 30),
+                                interval: (_trendMode == 'weekly') ? 1 : (_trendMode == 'monthly' ? 5 : 30),
                                 reservedSize: 28,
-                                getTitlesWidget: (value, meta) => Text(
-                                    value.toInt().toString(),
-                                    style: const TextStyle(fontSize: 10)),
+                                getTitlesWidget: (value, meta) => Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)),
                               ),
                             ),
-                            rightTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             bottomTitles: AxisTitles(
-                              axisNameWidget: Text('Date'),
+                              axisNameWidget: const Text('Date'),
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                interval: (_trendMode == 'weekly')
-                                    ? 1
-                                    : (_trendMode == 'monthly' ? 5 : 30),
+                                interval: (_trendMode == 'weekly') ? 1 : (_trendMode == 'monthly' ? 5 : 30),
                                 reservedSize: 22,
                                 getTitlesWidget: (value, meta) {
                                   final idx = value.toInt();
@@ -314,8 +243,7 @@ class _HomeTabState extends State<HomeTab> {
                                     final label = keys[idx].split('-').last;
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 6),
-                                      child: Text(label,
-                                          style: const TextStyle(fontSize: 10)),
+                                      child: Text(label, style: const TextStyle(fontSize: 10)),
                                     );
                                   }
                                   return const SizedBox.shrink();
@@ -323,16 +251,14 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ),
                           ),
-                          gridData:
-                              FlGridData(show: true, drawVerticalLine: false),
+                          gridData: FlGridData(show: true, drawVerticalLine: false),
                           borderData: FlBorderData(show: true),
                           minY: 0,
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text("Average reports/day: $average",
-                        style: const TextStyle(fontSize: 14)),
+                    Text("Average reports/day: $average", style: const TextStyle(fontSize: 14)),
                   ],
                 );
               },
@@ -354,9 +280,7 @@ class _HomeTabState extends State<HomeTab> {
           children: [
             Icon(icon, size: 40, color: color),
             const SizedBox(height: 10),
-            Text("$count",
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text("$count", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(label, textAlign: TextAlign.center),
           ],
