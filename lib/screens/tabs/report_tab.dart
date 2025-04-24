@@ -23,7 +23,13 @@ class _ReportIssueTabState extends State<ReportIssueTab> {
         .collection('reports')
         .orderBy('created_at', descending: true)
         .get();
-    return snapshot.docs.map((doc) => doc.data()).toList();
+
+    return snapshot.docs
+        .map((doc) => {
+              ...doc.data(),
+              'id': doc.id, // include document ID
+            })
+        .toList();
   }
 
   @override
@@ -61,7 +67,10 @@ class _ReportIssueTabState extends State<ReportIssueTab> {
             child: ListView.builder(
               itemCount: reports.length,
               itemBuilder: (context, index) {
-                return ReportCard(report: reports[index]);
+                final report = reports[index];
+                final reportId =
+                    report['id']; // assuming you added this in _fetchReports
+                return ReportCard(report: report, reportId: reportId);
               },
             ),
           );

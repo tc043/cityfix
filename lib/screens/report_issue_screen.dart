@@ -119,6 +119,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       'image_url': imageUrl,
       'user_id': user.uid,
       'created_at': DateTime.now().toIso8601String(),
+
     };
 
     try {
