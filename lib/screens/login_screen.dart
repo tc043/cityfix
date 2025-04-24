@@ -8,7 +8,8 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -26,8 +27,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _emailShakeController = AnimationController(vsync: this, duration: Duration(milliseconds: 300));
-    _passwordShakeController = AnimationController(vsync: this, duration: Duration(milliseconds: 300));
+    _emailShakeController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 300));
+    _passwordShakeController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 300));
   }
 
   @override
@@ -42,7 +45,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Future<void> _scrollToTop() async {
     if (_scrollController.hasClients) {
-      await _scrollController.animateTo(0, duration: Duration(milliseconds: 500), curve: Curves.easeInOut);
+      await _scrollController.animateTo(0,
+          duration: Duration(milliseconds: 500), curve: Curves.easeInOut);
     }
   }
 
@@ -51,7 +55,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     final password = _passwordController.text;
 
     setState(() {
-      _emailError = email.isEmpty || !email.contains('@') ? 'Enter a valid email' : null;
+      _emailError =
+          email.isEmpty || !email.contains('@') ? 'Enter a valid email' : null;
       _passwordError = password.isEmpty ? 'Password is required' : null;
     });
 
@@ -65,12 +70,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     setState(() => _isLoading = true);
 
     try {
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final UserCredential userCredential = await _auth
+          .signInWithEmailAndPassword(email: email, password: password);
 
       if (userCredential.user != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Login successful!'),backgroundColor: Colors.green),
+            SnackBar(
+                content: Text('Login successful!'),
+                backgroundColor: Colors.green),
           );
           await Future.delayed(Duration(seconds: 2));
           Navigator.pushReplacementNamed(context, '/home');
@@ -84,14 +92,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       _emailShakeController.forward(from: 0);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${e.message}'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Login failed: ${e.message}'),
+              backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       _scrollToTop();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unexpected error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Unexpected error: $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -99,13 +111,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
-  Widget _buildShakingField({required AnimationController controller, required Widget child}) {
+  Widget _buildShakingField(
+      {required AnimationController controller, required Widget child}) {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, childWidget) {
         final offset = 6.0 * (1 - controller.value);
         return Transform.translate(
-          offset: Offset(offset * (controller.status == AnimationStatus.forward ? 1 : -1), 0),
+          offset: Offset(
+              offset * (controller.status == AnimationStatus.forward ? 1 : -1),
+              0),
           child: childWidget,
         );
       },
@@ -135,7 +150,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ),
       ),
     );
-    return shakeController != null ? _buildShakingField(controller: shakeController, child: field) : field;
+    return shakeController != null
+        ? _buildShakingField(controller: shakeController, child: field)
+        : field;
   }
 
   @override
@@ -143,57 +160,71 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Scaffold(
       backgroundColor: Colors.white,
       body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: ListView(
-          controller: _scrollController,
-          children: [
-            const SizedBox(height: 30),
-            Center(
-              child: Column(
-                children: [
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 300,
+        padding: EdgeInsets.all(8.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 400),
+            child: ListView(
+              controller: _scrollController,
+              children: <Widget>[
+                const SizedBox(height: 30),
+                Center(
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'assets/images/logo.png',
+                        height: 300,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Login',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Login',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 32),
+                _buildTextField(
+                  label: 'Email',
+                  controller: _emailController,
+                  errorText: _emailError,
+                  shakeController: _emailShakeController,
+                ),
+                const SizedBox(height: 20),
+                _buildTextField(
+                  label: 'Password',
+                  controller: _passwordController,
+                  obscure: _obscurePassword,
+                  errorText: _passwordError,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                ],
-              ),
+                  shakeController: _passwordShakeController,
+                ),
+                const SizedBox(height: 24),
+                _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _login,
+                        child: const Text('Login'),
+                      ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Don't have an account? "),
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(context, '/register'),
+                      child: const Text("Register"),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
-            _buildTextField(
-              label: 'Email',
-              controller: _emailController,
-              errorText: _emailError,
-              shakeController: _emailShakeController,
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: 'Password',
-              controller: _passwordController,
-              obscure: _obscurePassword,
-              errorText: _passwordError,
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-              shakeController: _passwordShakeController,
-            ),
-            const SizedBox(height: 24),
-            _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-              onPressed: _login,
-              child: const Text('Login'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/register'),
-              child: Text("Don't have an account? Register"),
-            ),
-          ],
+          ),
         ),
       ),
     );
