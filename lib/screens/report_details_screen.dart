@@ -22,11 +22,17 @@ class ReportDetailsScreen extends StatefulWidget {
 
 class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   String? _address;
+  String? _currentStatus;
+  bool _isAdmin = false;
+
+  final List<String> _statusOptions = ['pending', 'in progress', 'resolved', 'rejected'];
 
   @override
   void initState() {
     super.initState();
     _getAddress();
+    _checkIfAdmin();
+    _currentStatus = widget.report['status'] ?? 'pending';
   }
 
   Future<void> _getAddress() async {
@@ -47,6 +53,33 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         _address = 'Unable to fetch address';
       });
     }
+  }
+
+  Future<void> _checkIfAdmin() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = await FirebaseFirestore.instance.collection('profiles').doc(user.uid).get();
+    final role = userDoc.data()?['role'];
+
+    setState(() {
+      _isAdmin = role == 'admin' || role == 'moderator';
+    });
+  }
+
+  Future<void> _updateStatus(String newStatus) async {
+    await FirebaseFirestore.instance
+        .collection('reports')
+        .doc(widget.reportId)
+        .update({'status': newStatus});
+
+    setState(() {
+      _currentStatus = newStatus;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Status updated to "$newStatus"')),
+    );
   }
 
   @override
@@ -79,12 +112,16 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const SizedBox(height: 8),
+            Text('Address: ${_address ?? "Loading..."}'),
+            const SizedBox(height: 16),
             SizedBox(
               height: 200,
               child: FlutterMap(
                 options: MapOptions(
-                  initialCenter: latlng.LatLng(widget.report['latitude'], widget.report['longitude']),
+                  initialCenter: latlng.LatLng(
+                    widget.report['latitude'],
+                    widget.report['longitude'],
+                  ),
                   initialZoom: 15.0,
                 ),
                 children: [
@@ -98,7 +135,10 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       Marker(
                         width: 80,
                         height: 80,
-                        point: latlng.LatLng(widget.report['latitude'], widget.report['longitude']),
+                        point: latlng.LatLng(
+                          widget.report['latitude'],
+                          widget.report['longitude'],
+                        ),
                         child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
                       ),
                     ],
@@ -108,10 +148,27 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             ),
 
             const SizedBox(height: 8),
-            Text(
-              'Reported at: ${report['created_at']}',
-              style: const TextStyle(color: Colors.grey),
-            ),
+            Text('Reported at: ${report['created_at']}'),
+            const SizedBox(height: 16),
+            Text('Current Status: ${_currentStatus?.toUpperCase()}'),
+            const SizedBox(height: 8),
+
+            if (_isAdmin)
+              DropdownButton<String>(
+                value: _currentStatus,
+                items: _statusOptions.map((status) {
+                  return DropdownMenuItem(
+                    value: status,
+                    child: Text(status.toUpperCase()),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null && value != _currentStatus) {
+                    _updateStatus(value);
+                  }
+                },
+              ),
+
             const SizedBox(height: 24),
             const Text(
               'Comments',
@@ -238,3 +295,4 @@ class _CommentSectionState extends State<CommentSection> {
     );
   }
 }
+
