@@ -97,6 +97,22 @@ class _ReportCardState extends State<ReportCard> {
     }
   }
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'in progress':
+        return Colors.blue;
+      case 'resolved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final report = widget.report;
@@ -151,6 +167,17 @@ class _ReportCardState extends State<ReportCard> {
                       fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 5),
+
+                if (report['status'] != null)
+                  Chip(
+                    label: Text(
+                      report['status'].toString().toUpperCase(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: _getStatusColor(report['status']),
+                  ),
+                const SizedBox(height: 5),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

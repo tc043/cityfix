@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -78,6 +79,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     });
   }
 
+
+
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -119,8 +123,9 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       'image_url': imageUrl,
       'user_id': user.uid,
       'created_at': DateTime.now().toIso8601String(),
-
+      'status': 'pending',
     };
+
 
     try {
       await FirebaseFirestore.instance.collection('reports').add(reportData);
@@ -183,7 +188,26 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                       _currentPosition!.longitude,
                     ),
                     initialZoom: 15,
+                    onTap: (tapPosition, point) {
+                      setState(() {
+                        _currentPosition = Position(
+                          latitude: point.latitude,
+                          longitude: point.longitude,
+                          timestamp: DateTime.now(),
+                          accuracy: 0.0,
+                          altitude: 0.0,
+                          altitudeAccuracy: 0.0,
+                          heading: 0.0,
+                          headingAccuracy: 0.0,
+                          speed: 0.0,
+                          speedAccuracy: 0.0,
+                          floor: null,
+                          isMocked: false,
+                        );
+                      });
+                    },
                   ),
+
                   children: [
                     TileLayer(
                       urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
