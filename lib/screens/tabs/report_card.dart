@@ -30,7 +30,8 @@ class _ReportCardState extends State<ReportCard> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final reportRef = FirebaseFirestore.instance.collection('reports').doc(widget.reportId);
+    final reportRef =
+        FirebaseFirestore.instance.collection('reports').doc(widget.reportId);
     final upvoteRef = reportRef.collection('upvotes').doc(user.uid);
 
     final upvoteSnap = await upvoteRef.get();
@@ -42,12 +43,12 @@ class _ReportCardState extends State<ReportCard> {
     });
   }
 
-
   Future<void> _toggleUpvote() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final reportRef = FirebaseFirestore.instance.collection('reports').doc(widget.reportId);
+    final reportRef =
+        FirebaseFirestore.instance.collection('reports').doc(widget.reportId);
     final upvoteRef = reportRef.collection('upvotes').doc(user.uid);
 
     final alreadyUpvoted = await upvoteRef.get();
@@ -82,7 +83,6 @@ class _ReportCardState extends State<ReportCard> {
       final lat = widget.report['latitude'];
       final lng = widget.report['longitude'];
 
-
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
@@ -111,7 +111,6 @@ class _ReportCardState extends State<ReportCard> {
         return Colors.grey;
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +166,6 @@ class _ReportCardState extends State<ReportCard> {
                       fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 5),
-
                 if (report['status'] != null)
                   Chip(
                     label: Text(
@@ -177,21 +175,28 @@ class _ReportCardState extends State<ReportCard> {
                     backgroundColor: _getStatusColor(report['status']),
                   ),
                 const SizedBox(height: 5),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on,
-                            size: 16, color: Colors.red),
-                        const SizedBox(width: 4),
-                        Text(
-                          _address != null ? _address! : 'Loading address...',
-                          style:
-                              const TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on,
+                              size: 16, color: Colors.red),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _address != null
+                                  ? _address!
+                                  : 'Loading address...',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Text(
                       _formatTimestamp(report['created_at']),
@@ -204,7 +209,9 @@ class _ReportCardState extends State<ReportCard> {
                   children: [
                     IconButton(
                       icon: Icon(
-                        _hasUpvoted ? Icons.arrow_upward : Icons.arrow_upward_outlined,
+                        _hasUpvoted
+                            ? Icons.arrow_upward
+                            : Icons.arrow_upward_outlined,
                         color: _hasUpvoted ? Colors.green : Colors.grey,
                       ),
                       onPressed: _toggleUpvote,

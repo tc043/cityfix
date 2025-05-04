@@ -11,7 +11,6 @@ import 'screens/login_screen.dart';
 import 'screens/registration_screen.dart';
 import 'screens/report_issue_screen.dart';
 import 'screens/tabs/map_tab.dart';
-import 'screens/reports_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +44,6 @@ class MyApp extends StatelessWidget {
         '/register': (context) => RegistrationScreen(),
         '/report': (context) => ReportIssueScreen(),
         '/map': (context) => MapTab(),
-        '/reports': (context) => ReportsListScreen(),
         '/edit-profile': (context) => EditProfileScreen(),
       },
     );
