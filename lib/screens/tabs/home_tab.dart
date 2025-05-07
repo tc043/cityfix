@@ -94,17 +94,10 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CityFix Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        title: const Text('Home', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: true,
         backgroundColor: Colors.teal,
         elevation: 4,
-        leading: const Icon(Icons.dashboard, color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -161,7 +154,7 @@ class _HomeTabState extends State<HomeTab> {
                           value: entry.value.toDouble(),
                           title: "${entry.key} (${percent.toStringAsFixed(1)}%)",
                           color: entry.key == 'Resolved' ? Colors.green : Colors.red,
-                          titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                          titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
                           radius: 70,
                         );
                       }).toList(),

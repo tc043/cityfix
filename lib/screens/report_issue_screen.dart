@@ -25,6 +25,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   final _picker = ImagePicker();
   final _descCtrl = TextEditingController();
   Position? _currentPosition;
+  bool _isSubmitting = false; // Add this to track submission state
 
   @override
   void initState() {
@@ -73,43 +74,83 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     setState(() => _imageBytes = data);
   }
 
-  void _showError(String m) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(m)));
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    _showMessage(message, isError: true);
   }
 
   Future<void> _submitReport() async {
-    if (_descCtrl.text.trim().isEmpty) return;
-    final pos = _currentPosition;
-    if (pos == null) return;
-    final u = FirebaseAuth.instance.currentUser;
-    if (u == null) return;
-
-    String? url;
-    if (_imageBytes != null) {
-      final name = 'report_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = FirebaseStorage.instance.ref('reports/$name');
-      await ref.putData(_imageBytes!);
-      url = await ref.getDownloadURL();
+    // Validate form
+    if (_descCtrl.text.trim().isEmpty) {
+      _showError('Please enter a description');
+      return;
     }
 
-    final doc = {
-      'description': _descCtrl.text.trim(),
-      'latitude': pos.latitude,
-      'longitude': pos.longitude,
-      'image_url': url,
-      'user_id': u.uid,
-      'created_at': DateTime.now().toIso8601String(),
-      'status': 'pending'
-    };
+    final pos = _currentPosition;
+    if (pos == null) {
+      _showError('Location not available');
+      return;
+    }
 
-    await FirebaseFirestore.instance.collection('reports').add(doc);
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) {
+      _showError('You must be logged in');
+      return;
+    }
+
+    // Show loading state
     setState(() {
-      _imageBytes = null;
-      _descCtrl.clear();
+      _isSubmitting = true;
     });
-    if (!mounted) return;
-    Navigator.pop(context);
+
+    try {
+      String? url;
+      if (_imageBytes != null) {
+        final name = 'report_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final ref = FirebaseStorage.instance.ref('reports/$name');
+        await ref.putData(_imageBytes!);
+        url = await ref.getDownloadURL();
+      }
+
+      final doc = {
+        'description': _descCtrl.text.trim(),
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+        'image_url': url,
+        'user_id': u.uid,
+        'created_at': DateTime.now().toIso8601String(),
+        'status': 'pending'
+      };
+
+      await FirebaseFirestore.instance.collection('reports').add(doc);
+
+      // Reset form
+      setState(() {
+        _imageBytes = null;
+        _descCtrl.clear();
+        _isSubmitting = false;
+      });
+
+      // Show success message
+      _showMessage('Report submitted successfully!');
+
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      // Handle errors
+      setState(() {
+        _isSubmitting = false;
+      });
+      _showError('Failed to submit report: ${e.toString()}');
+    }
   }
 
   bool get _hasImage => _imageBytes != null;
@@ -188,8 +229,23 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
             Text('Lat: ${loc.latitude}, Lng: ${loc.longitude}')
           ],
           const SizedBox(height: 20),
-          ElevatedButton(
-              onPressed: _submitReport, child: const Text('Submit'))
+          _isSubmitting
+              ? const Center(
+            child: Column(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 10),
+                Text('Submitting report...')
+              ],
+            ),
+          )
+              : ElevatedButton(
+              onPressed: _submitReport,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text('Submit Report')
+          )
         ]),
       ),
     );

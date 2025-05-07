@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -56,7 +57,25 @@ class _MapScreenState extends State<MapTab> {
     }
   }
 
-  void _showReportDialog(Map<String, dynamic> report) {
+  void _showReportDialog(Map<String, dynamic> report) async { // Made the function async
+    String locationText = 'Location: Lat ${report['latitude']}, Lng ${report['longitude']}';
+
+    try {
+      // Use geocoding to get address from coordinates
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        report['latitude'],
+        report['longitude'],
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark placemark = placemarks.first;
+        locationText = 'Location: ${placemark.street}, ${placemark.locality}, ${placemark.administrativeArea}, ${placemark.country}';
+      }
+    } catch (e) {
+      debugPrint('Error getting address: $e');
+      // Fallback to coordinates if geocoding fails
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -70,8 +89,7 @@ class _MapScreenState extends State<MapTab> {
                 Image.network(report['image_url'],
                     height: 150, fit: BoxFit.cover),
               const SizedBox(height: 10),
-              Text(
-                  'Location: Lat ${report['latitude']}, Lng ${report['longitude']}'),
+              Text(locationText), // Use the determined location text
               Text('Reported on: ${report['created_at']}'),
             ],
           ),
@@ -85,7 +103,6 @@ class _MapScreenState extends State<MapTab> {
       },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -43,7 +43,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     final snapshot =
-        await _firestore.collection('profiles').doc(user.uid).get();
+    await _firestore.collection('profiles').doc(user.uid).get();
 
     if (snapshot.exists) {
       setState(() {
@@ -111,6 +111,34 @@ class _ProfileTabState extends State<ProfileTab> {
     });
   }
 
+  // Show logout confirmation dialog
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Logout"),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await _signOut();
+    }
+  }
+
   Future<void> _signOut() async {
     await _auth.signOut();
     if (!mounted) return;
@@ -159,7 +187,7 @@ class _ProfileTabState extends State<ProfileTab> {
             CircleAvatar(
               radius: 50,
               backgroundImage: (_userData?['avatar_url'] != null &&
-                      _userData!['avatar_url'].toString().startsWith('http'))
+                  _userData!['avatar_url'].toString().startsWith('http'))
                   ? NetworkImage(_userData!['avatar_url'])
                   : null,
               child: _userData?['avatar_url'] == null
@@ -189,77 +217,77 @@ class _ProfileTabState extends State<ProfileTab> {
               child: _reports.isEmpty
                   ? const Center(child: Text('No reports submitted.'))
                   : NotificationListener<ScrollNotification>(
-                      onNotification: (scrollInfo) {
-                        if (!_isLoadingMore &&
-                            _hasMore &&
-                            scrollInfo.metrics.pixels ==
-                                scrollInfo.metrics.maxScrollExtent) {
-                          _fetchUserReports();
-                        }
-                        return false;
-                      },
-                      child: RefreshIndicator(
-                        onRefresh: () async {
-                          setState(() {
-                            _reports.clear();
-                            _lastVisible = null;
-                            _hasMore = true;
-                          });
-                          await _fetchUserReports();
-                        },
-                        child: ListView.builder(
-                          itemCount: _reports.length + (_hasMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == _reports.length) {
-                              return const Center(
-                                  child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: CircularProgressIndicator(),
-                              ));
-                            }
-                            final report = _reports[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              child: ListTile(
-                                title: Text(report['description']),
-                                subtitle: Text(
-                                    'Reported on: ${_formatTimestamp(report['created_at'])}'),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.red),
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text("Confirm Deletion"),
-                                        content: const Text(
-                                            "Are you sure you want to delete this report?"),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text("Cancel"),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              _deleteReport(report['id']);
-                                            },
-                                            child: const Text("Delete",
-                                                style: TextStyle(
-                                                    color: Colors.red)),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                onNotification: (scrollInfo) {
+                  if (!_isLoadingMore &&
+                      _hasMore &&
+                      scrollInfo.metrics.pixels ==
+                          scrollInfo.metrics.maxScrollExtent) {
+                    _fetchUserReports();
+                  }
+                  return false;
+                },
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _reports.clear();
+                      _lastVisible = null;
+                      _hasMore = true;
+                    });
+                    await _fetchUserReports();
+                  },
+                  child: ListView.builder(
+                    itemCount: _reports.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _reports.length) {
+                        return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: CircularProgressIndicator(),
+                            ));
+                      }
+                      final report = _reports[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          title: Text(report['description']),
+                          subtitle: Text(
+                              'Reported on: ${_formatTimestamp(report['created_at'])}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete,
+                                color: Colors.red),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Confirm Deletion"),
+                                  content: const Text(
+                                      "Are you sure you want to delete this report?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _deleteReport(report['id']);
+                                      },
+                                      child: const Text("Delete",
+                                          style: TextStyle(
+                                              color: Colors.red)),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
             const Divider(),
             SwitchListTile(
@@ -282,7 +310,7 @@ class _ProfileTabState extends State<ProfileTab> {
               },
             ),
             ElevatedButton.icon(
-              onPressed: _signOut,
+              onPressed: _confirmLogout, // Changed from _signOut to _confirmLogout
               icon: const Icon(Icons.logout),
               label: const Text("Log Out"),
               style: ElevatedButton.styleFrom(
