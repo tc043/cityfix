@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'tabs/home_tab.dart';
@@ -16,6 +19,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   DateTime? _lastBackPressed;
   final PageController _pageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    _updateFcmToken();
+  }
+
+  Future<void> _updateFcmToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+
+    final doc = FirebaseFirestore.instance.collection('profiles').doc(user.uid);
+    await doc.update({'fcmToken': token});
+  }
+
+
 
   final List<Widget> _screens = [
     const HomeTab(),

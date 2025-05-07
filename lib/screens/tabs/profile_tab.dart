@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:cityfix/theme_controller.dart';
 import 'package:intl/intl.dart';
+
+import '../../notifications_service.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -50,6 +53,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _userData = snapshot.data();
       });
     }
+
 
     setState(() => _isLoading = false);
   }
@@ -140,10 +144,22 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _signOut() async {
+    await FirebaseMessaging.instance.deleteToken();
+    await _firestore.collection('profiles').doc(_auth.currentUser!.uid).update({'fcm_token': FieldValue.delete()});
     await _auth.signOut();
     if (!mounted) return;
+
+    // Show SnackBar after logging out
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("You have logged out successfully."),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
+
 
   String _formatTimestamp(dynamic ts) {
     if (ts is Timestamp) {
@@ -294,11 +310,12 @@ class _ProfileTabState extends State<ProfileTab> {
               title: const Text('Enable Notifications'),
               secondary: const Icon(Icons.notifications),
               value: _notificationsEnabled,
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _notificationsEnabled = value;
                 });
-                _savePreferences();
+                await _savePreferences();
+                await NotificationsService().toggleNotifications(value);
               },
             ),
             SwitchListTile(

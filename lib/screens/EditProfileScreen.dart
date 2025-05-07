@@ -73,8 +73,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_pickedImage != null) {
         final ref = _storage
             .ref()
-            .child('user_avatars')
-            .child('${user.uid}.jpg'); // Use user UID for unique filename
+            .child('avatars/${user.uid}/profile.jpg'); // Use user UID for unique filename
 
         await ref.putFile(_pickedImage!);
         newAvatarUrl = await ref.getDownloadURL(); // Get the download URL of the uploaded image
