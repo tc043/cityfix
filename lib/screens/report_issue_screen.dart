@@ -159,7 +159,12 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   Widget build(BuildContext c) {
     final loc = _currentPosition;
     return Scaffold(
-      appBar: AppBar(title: const Text('Report Issue')),
+      appBar: AppBar(
+        title: const Text('Report Issues', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        centerTitle: true,
+        backgroundColor: Colors.teal,
+        elevation: 4,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [

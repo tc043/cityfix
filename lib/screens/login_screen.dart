@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       body: Padding(
-        padding: EdgeInsets.all(8.0),
+        padding: EdgeInsets.all(16.0),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 400),
@@ -175,6 +175,7 @@ class _LoginScreenState extends State<LoginScreen>
                         'assets/images/logo.png',
                         height: 300,
                       ),
+
                       const SizedBox(height: 16),
                       const Text(
                         'Login',

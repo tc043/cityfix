@@ -154,7 +154,7 @@ class _HomeTabState extends State<HomeTab> {
                           value: entry.value.toDouble(),
                           title: "${entry.key} (${percent.toStringAsFixed(1)}%)",
                           color: entry.key == 'Resolved' ? Colors.green : Colors.red,
-                          titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                          titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                           radius: 70,
                         );
                       }).toList(),

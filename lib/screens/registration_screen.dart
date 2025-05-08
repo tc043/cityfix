@@ -22,7 +22,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final TextEditingController _nameController = TextEditingController();
 
   final ScrollController _scrollController = ScrollController();
-  final GlobalKey _formKey = GlobalKey();
 
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
